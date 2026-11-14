@@ -1,12 +1,9 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import sharp from 'sharp';
 
-const output = process.argv[2];
-if (!output) throw Error('Pass the anatomy output directory.');
-await fs.mkdir(output, { recursive: true });
-
-const builds = {
+export const builds = {
   slim:  { shoulder: 67, chest: 57, waist: 43, hip: 53, thigh: 58, calf: 60, arm: 17, hand: 11 },
   average: { shoulder: 77, chest: 66, waist: 54, hip: 61, thigh: 69, calf: 69, arm: 21, hand: 12 },
   broad: { shoulder: 85, chest: 81, waist: 84, hip: 81, thigh: 83, calf: 75, arm: 27, hand: 13 },
@@ -18,7 +15,7 @@ const races = {
   dyer: { skin: '#e9e7df', outline: '#51454e', detail: '#9d8995', marker: '#7e646f', rim: '#faf2e9' },
 };
 
-function anatomy(race, sex, build, code) {
+export function anatomy(race, sex, build, code) {
   const c = races[race];
   const female = sex === 'f';
   const shoulder = build.shoulder * (female ? .90 : 1);
@@ -44,11 +41,16 @@ function anatomy(race, sex, build, code) {
   const dyerMark = race === 'dyer' ? '<circle cx="25" cy="215" r="11" fill="#825364" stroke="'+c.rim+'" stroke-width="2.2"/><path d="M25 210l4 5-4 5-4-5Z" fill="'+c.rim+'"/>' : '';
   return '<svg xmlns="http://www.w3.org/2000/svg" width="480" height="660" viewBox="-240 0 480 660"><g fill="'+c.skin+'" stroke="'+c.outline+'" stroke-width="5" stroke-linejoin="round"><path d="'+leg+'"/><path d="'+leg+'" transform="scale(-1 1)"/><path d="'+armPath+'"/><path d="'+armPath+'" transform="scale(-1 1)"/><path d="'+torso+'"/><ellipse cy="92" rx="'+head+'" ry="51"/><path d="M-21 143q4-6 13-6H8q9 0 13 6v14L0 172l-21-15Z"/></g><g fill="none" stroke="'+c.detail+'" stroke-width="2.6" stroke-linecap="round"><path d="M0 184v166"/>'+ribs+muscleLines+femaleContour+(race==='human'?'<path d="M-22 113q4 17 22 17t22-17"/>':'')+'</g>'+(race==='dyer'?undeadFace:'')+'<g fill="'+c.marker+'" stroke="'+c.rim+'" stroke-width="1.8">'+[point(0,86),point(0,159),point(0,224),point(0,300),point(0,350),...[-1,1].flatMap(side=>[point(side*elbow,281),point(side*wrist,355),point(side*(thigh-20),478),point(side*(calf-12),583)])].join('')+'</g>'+dyerMark+'</svg>';
 }
-for (const race of Object.keys(races)) {
-  for (const sex of ['m', 'f']) {
-    for (const [code, build] of Object.entries(builds)) {
-      const svg = anatomy(race, sex, build, code);
-      await sharp(Buffer.from(svg)).png().toFile(path.join(output, race+'-'+sex+'-'+code+'.png'));
+if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
+  const output = process.argv[2];
+  if (!output) throw Error('Pass the anatomy output directory.');
+  await fs.mkdir(output, { recursive: true });
+  for (const race of Object.keys(races)) {
+    for (const sex of ['m', 'f']) {
+      for (const [code, build] of Object.entries(builds)) {
+        const svg = anatomy(race, sex, build, code);
+        await sharp(Buffer.from(svg)).png().toFile(path.join(output, race+'-'+sex+'-'+code+'.png'));
+      }
     }
   }
 }
